@@ -53,10 +53,15 @@ class Find(SQLModel, table=True):
 def leaderboard_rows(hunt: Hunt) -> List[dict]:
     """Return leaderboard rows for a hunt based on correct finds."""
     scores = {}
+    counted_pairs = set()
     for clue in hunt.clues or []:
         for find in clue.finds or []:
             if not find.correct:
                 continue
+            pair = (find.user_id, find.clue_id)
+            if pair in counted_pairs:
+                continue
+            counted_pairs.add(pair)
             scores.setdefault(find.user_id, 0)
             scores[find.user_id] += 1
     rows = [
