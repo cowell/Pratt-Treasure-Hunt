@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -7,48 +7,60 @@ from sqlmodel import Field, Relationship, SQLModel
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True, nullable=False, unique=True)
-    name: str
-    timezone: str = "UTC"
+    display_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     active: bool = True
 
-    habits: List["Habit"] = Relationship(back_populates="owner")
-    checkins: List["CheckIn"] = Relationship(back_populates="user")
+    finds: List["Find"] = Relationship(back_populates="user")
 
 
-class Habit(SQLModel, table=True):
+class Hunt(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    owner_id: int = Field(foreign_key="user.id")
     title: str
-    target_per_week: int = 3
+    description: str = ""
+    reward: str = ""
+    active: bool = True
+    ends_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    archived: bool = False
 
-    owner: User = Relationship(back_populates="habits")
-    checkins: List["CheckIn"] = Relationship(back_populates="habit")
+    clues: List["Clue"] = Relationship(back_populates="hunt")
 
 
-class CheckIn(SQLModel, table=True):
+class Clue(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    hunt_id: int = Field(foreign_key="hunt.id")
+    prompt: str
+    answer: str
+    order: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    hunt: Hunt = Relationship(back_populates="clues")
+    finds: List["Find"] = Relationship(back_populates="clue")
+
+
+class Find(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
-    habit_id: int = Field(foreign_key="habit.id")
-    note: str = ""
+    clue_id: int = Field(foreign_key="clue.id")
+    submitted_answer: str
+    correct: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    user: User = Relationship(back_populates="checkins")
-    habit: Habit = Relationship(back_populates="checkins")
+    user: User = Relationship(back_populates="finds")
+    clue: Clue = Relationship(back_populates="finds")
 
 
-def weekly_habit_summary(habit: Habit, reference: Optional[datetime] = None) -> dict:
-    """Return completion counts for the last 7 days."""
-    now = reference or datetime.now(timezone.utc)
-    window_start = now - timedelta(days=7)
-    completions = [
-        checkin for checkin in (habit.checkins or []) if checkin.created_at >= window_start
+def leaderboard_rows(hunt: Hunt) -> List[dict]:
+    """Return leaderboard rows for a hunt based on correct finds."""
+    scores = {}
+    for clue in hunt.clues or []:
+        for find in clue.finds or []:
+            if not find.correct:
+                continue
+            scores.setdefault(find.user_id, 0)
+            scores[find.user_id] += 1
+    rows = [
+        {"user_id": user_id, "score": score}
+        for user_id, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)
     ]
-    return {
-        "habit_id": habit.id,
-        "title": habit.title,
-        "target_per_week": habit.target_per_week,
-        "completed_past_week": len(completions),
-    }
+    return rows

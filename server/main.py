@@ -6,12 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from .database import get_session, init_db
-from .models import CheckIn, Habit, User, weekly_habit_summary
+from .models import Clue, Find, Hunt, User, leaderboard_rows
 
 app = FastAPI(
-    title="Fitness Habit API",
-    description="Self-hosted backend for the accountability Android app.",
-    version="0.1.0",
+    title="Treasure Hunt API",
+    description="Self-hosted backend for a prize-driven treasure hunt app.",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -46,42 +46,52 @@ def create_user(user: User, session: Annotated[Session, Depends(get_session)]) -
     return user
 
 
-@app.post("/habits", response_model=Habit, status_code=status.HTTP_201_CREATED)
-def create_habit(habit: Habit, session: Annotated[Session, Depends(get_session)]) -> Habit:
-    owner = session.get(User, habit.owner_id)
-    if not owner:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    session.add(habit)
+@app.post("/hunts", response_model=Hunt, status_code=status.HTTP_201_CREATED)
+def create_hunt(hunt: Hunt, session: Annotated[Session, Depends(get_session)]) -> Hunt:
+    session.add(hunt)
     session.commit()
-    session.refresh(habit)
-    return habit
+    session.refresh(hunt)
+    return hunt
 
 
-@app.post("/checkins", response_model=CheckIn, status_code=status.HTTP_201_CREATED)
-def create_checkin(
-    checkin: CheckIn, session: Annotated[Session, Depends(get_session)]
-) -> CheckIn:
-    user = session.get(User, checkin.user_id)
-    habit = session.get(Habit, checkin.habit_id)
-    if not user or not habit:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User or habit not found")
-    session.add(checkin)
+@app.post("/clues", response_model=Clue, status_code=status.HTTP_201_CREATED)
+def create_clue(clue: Clue, session: Annotated[Session, Depends(get_session)]) -> Clue:
+    hunt = session.get(Hunt, clue.hunt_id)
+    if not hunt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hunt not found")
+    session.add(clue)
     session.commit()
-    session.refresh(checkin)
-    return checkin
+    session.refresh(clue)
+    return clue
 
 
-@app.get("/users/{user_id}/summary", response_model=dict)
-def user_summary(
-    user_id: int, session: Annotated[Session, Depends(get_session)]
+@app.post("/finds", response_model=Find, status_code=status.HTTP_201_CREATED)
+def submit_find(find: Find, session: Annotated[Session, Depends(get_session)]) -> Find:
+    user = session.get(User, find.user_id)
+    clue = session.get(Clue, find.clue_id)
+    if not user or not clue:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User or clue not found")
+
+    normalized_answer = (find.submitted_answer or "").strip().lower()
+    correct_answer = (clue.answer or "").strip().lower()
+    find.correct = normalized_answer == correct_answer
+
+    session.add(find)
+    session.commit()
+    session.refresh(find)
+    return find
+
+
+@app.get("/hunts/{hunt_id}/leaderboard", response_model=dict)
+def hunt_leaderboard(
+    hunt_id: int, session: Annotated[Session, Depends(get_session)]
 ) -> dict:
-    user = session.exec(select(User).where(User.id == user_id)).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    hunt = session.exec(select(Hunt).where(Hunt.id == hunt_id)).first()
+    if not hunt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hunt not found")
 
-    habits: List[Habit] = session.exec(select(Habit).where(Habit.owner_id == user_id)).all()
-    for habit in habits:
-        session.refresh(habit, attribute_names=["checkins"])
+    session.refresh(hunt, attribute_names=["clues"])
+    for clue in hunt.clues:
+        session.refresh(clue, attribute_names=["finds"])
 
-    summaries = [weekly_habit_summary(habit) for habit in habits]
-    return {"user_id": user.id, "name": user.name, "habits": summaries}
+    return {"hunt_id": hunt.id, "title": hunt.title, "leaderboard": leaderboard_rows(hunt)}

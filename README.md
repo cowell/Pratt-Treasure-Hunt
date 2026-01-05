@@ -1,6 +1,6 @@
-# Fitness accountability app (self-hosted backend)
+# Treasure Hunt Prizes (self-hosted backend)
 
-This repository starts a self-hosted FastAPI backend for a fitness accountability Android app. The API tracks users, weekly habits, and check-ins so your mobile app can deliver streaks, leaderboards, and team challenges without relying on third-party clouds.
+This repository now provides a self-hosted FastAPI backend for a prize-driven treasure hunt app. Players join hunts, solve clues, and submit answers to climb leaderboards. You control rewards and hosting so you’re not locked into third-party platforms.
 
 ## Running locally
 
@@ -15,30 +15,37 @@ The server defaults to SQLite at `app.db`. Override with `DATABASE_URL` (e.g., `
 
 ## Example requests
 
-Create a user:
+Create a player:
 ```bash
 curl -X POST http://localhost:8000/users \
   -H "Content-Type: application/json" \
-  -d '{"email":"alex@example.com","name":"Alex","timezone":"UTC"}'
+  -d '{"email":"alex@example.com","display_name":"Alex"}'
 ```
 
-Add a habit for that user:
+Create a hunt:
 ```bash
-curl -X POST http://localhost:8000/habits \
+curl -X POST http://localhost:8000/hunts \
   -H "Content-Type: application/json" \
-  -d '{"owner_id":1,"title":"Morning run","target_per_week":4}'
+  -d '{"title":"City Secrets","description":"Solve clues downtown","reward":"$100 gift","active":true}'
 ```
 
-Record a check-in:
+Add a clue to that hunt (simple answer match for demo purposes):
 ```bash
-curl -X POST http://localhost:8000/checkins \
+curl -X POST http://localhost:8000/clues \
   -H "Content-Type: application/json" \
-  -d '{"user_id":1,"habit_id":1,"note":"5km loop"}'
+  -d '{"hunt_id":1,"prompt":"Find the red door on Main St","answer":"lantern"}'
 ```
 
-Retrieve a weekly summary:
+Submit an answer (case-insensitive):
 ```bash
-curl http://localhost:8000/users/1/summary
+curl -X POST http://localhost:8000/finds \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":1,"clue_id":1,"submitted_answer":"Lantern"}'
+```
+
+Retrieve leaderboard for a hunt:
+```bash
+curl http://localhost:8000/hunts/1/leaderboard
 ```
 
 ## Tests
