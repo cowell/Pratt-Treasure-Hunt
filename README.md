@@ -48,6 +48,12 @@ Retrieve leaderboard for a hunt:
 curl http://localhost:8000/hunts/1/leaderboard
 ```
 
+## Operations templates
+
+- Player rules: [`docs/player_rules.md`](docs/player_rules.md)
+- Shop handout: [`docs/shop_handout.md`](docs/shop_handout.md)
+- Hunt setup checklist: [`docs/hunt_checklist.md`](docs/hunt_checklist.md)
+
 ## Tests
 
 Run the FastAPI test suite (uses an in-memory SQLite database):
