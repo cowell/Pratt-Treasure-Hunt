@@ -48,6 +48,9 @@ Retrieve leaderboard for a hunt:
 curl http://localhost:8000/hunts/1/leaderboard
 ```
 
+## Build a mobile client
+- See [`docs/android_client.md`](docs/android_client.md) for an Android Studio quickstart that consumes these endpoints.
+
 ## Operations templates
 
 - Player rules: [`docs/player_rules.md`](docs/player_rules.md)
